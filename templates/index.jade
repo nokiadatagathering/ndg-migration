@@ -1,0 +1,90 @@
+doctype html
+html
+  head
+    title Migrator
+    meta(http-equiv="Content-Type", content="text/html; charset=utf-8")
+    meta(content="width=device-width, initial-scale=1.0")
+    link(rel="stylesheet", href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css")
+    script(type="text/javascript", src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js")
+    script(type="text/javascript", src="/js/socket.io.min.js")
+    script(src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js")
+  body
+    .container#main
+      #content
+        legend.well Migrator
+          form#form.form-horizontal(method="post", action='/index')
+            .form-group
+              label.control-label(for="mongodbUrl") mongodb url
+              input#mongodbUrl.form-control(placeholder="mongodb://127.0.0.1:27017/migrator", type="text", name="mongodbUrl", required)
+            .form-group
+              label.control-label(for="msqlHost") MSQL host
+              input#msqlHost.form-control(placeholder="localhost", type="text", name="msqlHost", required)
+            .form-group
+            .form-group
+              label.control-label(for="database") MSQL database name
+              input#database.form-control(placeholder="codezon_ndg_ng", type="text", name="database", required)
+              label.control-label(for="msqlUser") MSQL user
+              input#msqlUser.form-control(placeholder="root", type="text", name="msqlUser", required)
+            .form-group
+              label.control-label(for="msqlPass") MSQL password
+              input#msqlPass.form-control(type="password", name="msqlPass")
+            button.btn-large.btn-info.btn(type="submit") Submit
+        h4#log.text-info.hide Log
+        blockquote.hide
+        img#loader.hide.center-block(src ="/img/loader.gif")
+    script(type="text/javascript").
+    script(type="text/javascript").
+
+      $(function() {
+        function showMes (message) {
+          $('blockquote').append('<p class = "text-success">' + message +'</p>');
+          console.log(message);          
+        }
+        function showErr (message) {
+          $('blockquote').append('<p class = "text-danger">' + message +'</p>');
+          console.log(message);          
+        }
+        var socket = io.connect('http://localhost');
+        socket.on('mes', function (message) {
+          showMes(message);
+        });
+        socket.on('err', function (message) {
+          $('#loader').addClass('hide');
+          showErr(message);
+          $('button').prop('disabled', false);
+        });
+        socket.on('progress', function (message) {
+          console.log(message);
+          if (+message == 1) {
+            var pr = '<div class="progress"><div class="progress-bar" role="progressbar"></div></div>';
+            $('blockquote').append(pr);
+          }
+          $('.progress-bar').css('width', message + '%').text(message + '%');
+          if (+message == 100) {
+            $('.progress').hide();
+          }          
+        });
+        socket.on('end', function (message) {
+          $('#loader').addClass('hide');
+          showMes(message);
+          $('button').prop('disabled', false);
+          //socket.disconnect();
+        });
+        $('#form').submit(function() {
+          $('button').prop('disabled', true);
+          var $form = $('#form');
+          $.ajax({
+            url: $form.attr('action'),
+            type: $form.attr('method'),
+            data: $form.serialize()
+          }).done(function() {
+            $('.hide').removeClass('hide');
+            $('blockquote').css({
+              'max-height': '500px',
+              'overflow': 'auto',
+            }).empty();
+          });
+          return false;
+        });
+      });
+      
