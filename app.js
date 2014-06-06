@@ -66,7 +66,25 @@ var conn,
   usersColl = {},
   groupsColl = {},
   survColl = {},
-  msqlUsrs;
+  msqlUsrs,
+  countr = 1,
+  prcOld = 0;
+
+function sendProgress (total) {
+  var percent = Math.ceil(countr / total * 100);
+  if (countr == total) {
+    percent = 0;
+    countr = 1;
+    prcOld = 0;
+    return;
+  }
+  countr++;
+  if (percent > prcOld) {
+    prcOld = percent;
+    emitter.emit('progress', percent);
+    //console.log(percent);
+  }
+}
 
 var GetMysqlGroups = function(){
     conn.query('SELECT * FROM ndg_group', function (err, results) {
@@ -99,6 +117,7 @@ var GetMysqlGroups = function(){
                         return;
                       } else {
                         groupsColl[grp.id] = group._id;
+                        sendProgress(results.length);
                         callback();
                       }
                     })
@@ -185,7 +204,9 @@ var GetMysqlUsers = function () {
                   return;
                 }
                 var username = usr.username;
-                usersColl[username] = usr._id;
+                usersColl[username] = usr;
+
+                sendProgress(usrs.length);
                 callback();
               })
             }
@@ -214,13 +235,16 @@ function setOwners () {
           emitter.emit('err', util.inspect(err,{ depth: null}));
           return;
         }
-        user._owner = usersColl[owner[0].user_admin] || user._id;
+
+        user._owner = usersColl[owner[0].user_admin] ? usersColl[owner[0].user_admin]._id : user._id;
+        usersColl[user.username]._owner = user._owner;
         user.save(function (err, usr) {
           if (err) {
             console.log(err);
             emitter.emit('err', util.inspect(err,{ depth: null}));
             return;
           }
+          sendProgress(users.length);
           callback();
         })
       })
@@ -235,6 +259,7 @@ function setOwners () {
 function setGroups () {
   async.each(msqlUsrs, function (user, callback) {
     if (!user.ndg_group_id) {
+      sendProgress(msqlUsrs.length);
       callback();
       return
     }
@@ -251,6 +276,7 @@ function setGroups () {
           emitter.emit('err', util.inspect(err,{ depth: null}));
           return;
         }
+        sendProgress(msqlUsrs.length);
         callback();
       });
     })
@@ -262,14 +288,14 @@ function setGroups () {
 };
 
 var GetMysqlSurveys = function () {
-  conn.query('SELECT * FROM survey', function (err, results) {
+  conn.query('SELECT * FROM survey', function (err, sresults) {
     if (err) {
       console.log(err);
       emitter.emit('err', util.inspect(err,{ depth: null}));
       return;
     } else {
-      if (results.length) {
-        async.each(results, function (survey, sCallback) {
+      if (sresults.length) {
+        async.each(sresults, function (survey, sCallback) {
           survey._categories = [];
           conn.query('SELECT * FROM category WHERE survey_id = ?', survey.id, function (err, ctgrs) {
             if(err) {
@@ -397,6 +423,7 @@ var GetMysqlSurveys = function () {
                         return;
                       }
                       survColl[survey.id] = srv;
+                      sendProgress(sresults.length);
                       sCallback();
                     })
                   })
@@ -422,8 +449,6 @@ var GetMysqlResults = function(){
       return;
     } else {
       if (results.length) {
-        var i = 1,
-          prcOld = 0;
         async.each(results, function (reslt, callback) {
           async.waterfall([
             function (cb) {
@@ -433,16 +458,9 @@ var GetMysqlResults = function(){
                   emitter.emit('err', util.inspect(err,{ depth: null}));
                   return;
                 }
-                User.findOne({username: usr[0].username}, function (err, user) {
-                  if (err) {
-                    console.log(err);
-                    emitter.emit('err', util.inspect(err,{ depth: null}));
-                    return;
-                  }
-                  reslt._user = user._id;
-                  reslt._owner = user._owner;
-                  cb();
-                })
+                reslt._user = usersColl[usr[0].username]._id;
+                reslt._owner = usersColl[usr[0].username]._owner;
+                cb();
               })
             },
 
@@ -503,13 +521,7 @@ var GetMysqlResults = function(){
                 emitter.emit('err', util.inspect(err,{ depth: null}));
                 return;
               }
-              i++;
-              var percent = Math.ceil(i / results.length * 100);
-              if (percent > prcOld) {
-                prcOld = percent;
-                emitter.emit('progress', percent);
-                console.log(percent);
-              }
+              sendProgress(results.length);
               
               callback();
             })
@@ -546,9 +558,11 @@ function setResultsCount () {
               emitter.emit('err', util.inspect(err,{ depth: null}));
               return;
             }
+            sendProgress(surveys.length);
             callback();
           })
         } else {
+          sendProgress(surveys.length);
           callback();
         }
       })
