@@ -484,36 +484,36 @@ var GetMysqlResults = function(){
                   })
                 }
               });
-              conn.query('SELECT * FROM answer WHERE ndg_result_id = ?', reslt.id, function (err, answs) {
+              var q = [
+                'SELECT a.text_data, c.object_name AS cat_id, q.object_name AS quest_id',
+                'FROM answer AS a',
+                '    JOIN question AS q ON a.question_id = q.id',
+                '    JOIN category AS c ON q.category_id = c.id',
+                'WHERE ndg_result_id = ?'
+              ].join("\n");
+              conn.query(q, reslt.id, function (err, answs) {
                 if(err) {
                   console.log(err);
                   emitter.emit('err', util.inspect(err,{ depth: null}));
                   return;
                 }
-                if (answs.length) {
-                  async.each(answs, function (answer, anCallback) {
-                    conn.query('SELECT * FROM question WHERE id = ?', answer.question_id, function (err, question) {
-                      conn.query('SELECT object_name FROM category WHERE id = ?', question[0].category_id, function (err, category) {
-                        category[0].object_name
-                        reslt._categoryResults.forEach(function (catRes) {
-                          if (catRes.id == category[0].object_name) {
-                            catRes._questionResults.forEach(function (qstRes) {
-                              if (qstRes.id == question[0].object_name) {
-                                qstRes.result = answer.text_data;
-                                anCallback();
-                              }
-                            })
-                          }
-                        })
-                      })
-                    })
-                  }, cb)
-                } else {
-                  cb();
+                if (!answs.length) {
+                  return cb();
                 }
-              })
+                answs.forEach(function (answer) {
+                  reslt._categoryResults.filter(function (catRes) {
+                    return catRes.id == answer.cat_id;
+                  }).forEach(function (catRes) {
+                    catRes._questionResults.filter(function (qstRes) {
+                      return qstRes.id == answer.quest_id;
+                    }).forEach(function (qstRes) {
+                      qstRes.result = answer.text_data;
+                    });
+                  });
+                });
+                cb();
+              });
             }
-            
           ], function () {
             new Result(reslt).save(function (err, res) {
               if(err) {
@@ -581,13 +581,20 @@ function finish() {
   console.log('\n successfully completed')
 }
 
-emitter.on('finish', finish);
-emitter.on('setResultsCount', setResultsCount);
-emitter.on('GetMysqlResults', GetMysqlResults);
-emitter.on('GetMysqlSurveys', GetMysqlSurveys);
-emitter.on('setOwners', setOwners);
-emitter.on('setGroups', setGroups);
-emitter.on('createGroups', GetMysqlGroups);
+function __log__(fn) {
+  return function () {
+    conn.__log__();
+    fn();
+  };
+}
+
+emitter.on('finish', __log__(finish));
+emitter.on('setResultsCount', __log__(setResultsCount));
+emitter.on('GetMysqlResults', __log__(GetMysqlResults));
+emitter.on('GetMysqlSurveys', __log__(GetMysqlSurveys));
+emitter.on('setOwners', __log__(setOwners));
+emitter.on('setGroups', __log__(setGroups));
+emitter.on('createGroups', __log__(GetMysqlGroups));
 
 function dbConnect(config, cb) {
   mongoose.connect(config.mongodbUrl, function (err) {// mongodb://127.0.0.1:27017/migrator
@@ -615,6 +622,19 @@ function dbConnect(config, cb) {
       }
       console.log('\r\n Connected to MsqlDb');
       cb();
+
+      (function () {
+        var _old = conn.query, cnt = 0;
+        conn.query = function () {
+          cnt++;
+          _old.apply(conn, arguments);
+        };
+        conn.__log__ = function () {
+          console.log('Num of MySql queries:', cnt);
+          cnt = 0;
+        };
+      }());
+
       GetMysqlUsers();
     });
   });
