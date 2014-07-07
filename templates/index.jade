@@ -6,12 +6,13 @@ html
     meta(content="width=device-width, initial-scale=1.0")
     link(rel="stylesheet", href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css")
     script(type="text/javascript", src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js")
-    script(type="text/javascript", src="/js/socket.io.min.js")
+    script(type="text/javascript", src="/socket.io/socket.io.js")
     script(src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js")
   body
     .container#main
       #content
-        legend.well Migrator
+        .well
+          legend Migrator
           form#form.form-horizontal(method="post", action='/index')
             .form-group
               label.control-label(for="mongodbUrl") mongodb url
@@ -20,14 +21,33 @@ html
               label.control-label(for="msqlHost") MSQL host
               input#msqlHost.form-control(placeholder="localhost", type="text", name="msqlHost", required)
             .form-group
-            .form-group
               label.control-label(for="database") MSQL database name
               input#database.form-control(placeholder="codezon_ndg_ng", type="text", name="database", required)
+            .form-group
               label.control-label(for="msqlUser") MSQL user
               input#msqlUser.form-control(placeholder="root", type="text", name="msqlUser", required)
             .form-group
               label.control-label(for="msqlPass") MSQL password
               input#msqlPass.form-control(type="password", name="msqlPass")
+            .form-group#passSet
+              .radio-inline
+                label
+                  input(name="setPass", type="radio", value="password", checked)
+                  small Set users password as 
+                    i 'password'
+              .radio-inline
+                label
+                  input(name="setPass", type="radio", value="setRandomPass")
+                  small Set random users password
+            .form-group#sendBy(style="display: none;")
+              .checkbox-inline
+                label
+                  input(name="sendemail", type="checkbox", value="sendemail")
+                  small Send password by Email
+              .checkbox-inline
+                label
+                  input(name="sendsms", type="checkbox", value="sendsms")
+                  small Send password by SMS
             button.btn-large.btn-info.btn(type="submit") Submit
         h4#log.text-info.hide Log
         blockquote.hide
@@ -44,7 +64,7 @@ html
           $('blockquote').append('<p class = "text-danger">' + message +'</p>');
           console.log(message);          
         }
-        var socket = io.connect('http://localhost');
+        var socket = io.connect('/');
         socket.on('mes', function (message) {
           showMes(message);
         });
@@ -86,5 +106,13 @@ html
           });
           return false;
         });
+        $('#passSet input[type=radio]').change(function(){
+          if (this.value == 'password') {
+            console.log($('#sendBy'))
+            $('#sendBy').hide();
+          } else {
+            $('#sendBy').show();
+          }
+        })
       });
       

@@ -6,6 +6,9 @@ var
   express = require('express'),
   http = require('http'),
   util = require('util'),
+  generatePassword = require('password-generator'),
+  MailService = require('./services/Mail'),
+  SmsService = require('./services/Sms'),
   app = express(),
 
   User = require('./models/User'),
@@ -116,7 +119,7 @@ var GetMysqlGroups = function(){
     });
 };
 
-var GetMysqlUsers = function () {
+var GetMysqlUsers = function (passConf) {
   var q = [
    " SELECT u.username,",
      " 'password' AS `password`,",
@@ -152,11 +155,20 @@ var GetMysqlUsers = function () {
         if (usr.user_admin == usr.username) {
           usr.permission = 'superAdmin';
         }
+        if (passConf.setRandomPass) {
+          usr.password = generatePassword();
+        }
         new User(usr).save(function(err, user) {
           if(err) {
             console.log(err);
             emitter.emit('err', util.inspect(err,{ depth: null}));
             return;
+          }
+          if (passConf.sendemail) {
+            MailService.sendPassword(user);
+          }
+          if (passConf.sendsms) {
+            SmsService.sendSms('Your new NDG password is ' + user.password, user.phone);
           }
           user.ndg_group_id = usr.ndg_group_id;
           user.user_admin = usr.user_admin;
@@ -509,7 +521,6 @@ function dbConnect(config, cb) {
     }
 
     mongoose.connection.db.executeDbCommand({dropDatabase:1});
-    //mongoose.connection.db.dropDatabase();
     console.log('\r\n Connected to MongoDb v.' + mongoose.version);
     conn = mysql.createConnection({
       host     : config.msqlHost,//localhost
@@ -539,7 +550,12 @@ function dbConnect(config, cb) {
         };
       }());
 
-      GetMysqlUsers();
+      var passConf = {
+        setRandomPass: config.setPass == 'setRandomPass' ? true : false,
+        sendemail: config.sendemail == 'sendemail' ? true : false,
+        sendsms: config.sendsms == 'sendsms' ? true : false
+      };
+      GetMysqlUsers(passConf);
     });
   });
 }
