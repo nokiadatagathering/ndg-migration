@@ -16,17 +16,20 @@ tpl = function (templateName, locals) {
     });
 
   locals = locals || {};
-  locals.title = "New NDG password";
+  locals.title = config.mail.title;// || "New NDG password";
+  locals.mainbody = config.mail.body;// || "Your new password is";
+  locals.sign = config.mail.sign;// || "NDG";
 
   return fn(locals);
 };
 
-exports.sendPassword = function (user) {
+exports.sendPassword = function (user, password) {
   var
-    subject = 'Password',
+    subject = config.mail.subject;// || 'Password',
     html = tpl('password', {
       subject: subject,
-      user: user
+      user: user,
+      password: password
     });
   
   var message = {

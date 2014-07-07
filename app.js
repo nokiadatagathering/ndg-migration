@@ -1,4 +1,5 @@
 var
+  fs = require('fs'),
   mongoose = require('mongoose'),
   mysql = require('mysql'),
   async = require('async'),
@@ -9,6 +10,7 @@ var
   generatePassword = require('password-generator'),
   MailService = require('./services/Mail'),
   SmsService = require('./services/Sms'),
+  config = require('./config').config,
   app = express(),
 
   User = require('./models/User'),
@@ -151,6 +153,9 @@ var GetMysqlUsers = function (passConf) {
       emitter.emit('err', util.inspect(err,{ depth: null}));
       return;
     }
+    var
+      smsLog = [],
+      emailLog = [];
     async.each(usrs, function (usr, callback) {
         if (usr.user_admin == usr.username) {
           usr.permission = 'superAdmin';
@@ -158,6 +163,10 @@ var GetMysqlUsers = function (passConf) {
         if (passConf.setRandomPass) {
           usr.password = generatePassword();
         }
+
+        var password = usr.password;
+        usr.password = new Buffer(usr.password).toString('base64');
+
         new User(usr).save(function(err, user) {
           if(err) {
             console.log(err);
@@ -165,10 +174,16 @@ var GetMysqlUsers = function (passConf) {
             return;
           }
           if (passConf.sendemail) {
-            MailService.sendPassword(user);
+            //MailService.sendPassword(user, password);
+            var e = {};
+            e[user.email] = password;
+            emailLog.push(e);
           }
           if (passConf.sendsms) {
-            SmsService.sendSms('Your new NDG password is ' + user.password, user.phone);
+            //SmsService.sendSms(config.sms + password, user.phone);
+            var ph = {};
+            ph[user.phone] = password;
+            smsLog.push(ph);
           }
           user.ndg_group_id = usr.ndg_group_id;
           user.user_admin = usr.user_admin;
@@ -178,6 +193,24 @@ var GetMysqlUsers = function (passConf) {
           callback();
         })
       }, function () {
+          if (smsLog.length) {
+            fs.writeFile('./logs/sms.json', JSON.stringify(smsLog, null, 4), function(err) {
+              if(err) {
+                console.log(err);
+              } else {
+                console.log("SMS log saved");
+              }
+            });
+          }
+          if (emailLog.length) {
+            fs.writeFile('./logs/email.json', JSON.stringify(emailLog, null, 4), function(err) {
+              if(err) {
+                console.log(err);
+              } else {
+                console.log("Email log saved");
+              }
+            });
+          }
           console.log('users created');
           emitter.emit('mes', 'users created');
           emitter.emit('setOwners');
