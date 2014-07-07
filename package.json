@@ -12,6 +12,9 @@
     "socket.io": "*",
     "mongoose": "*",
     "mysql": "*",
+    "password-generator": "^0.2.2",
+    "mandrill-api":">=1.0.2",
+    "twilio": "*",
     "async": "*"
   }
 }
