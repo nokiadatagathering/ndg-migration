@@ -121,6 +121,15 @@ var GetMysqlGroups = function(){
     });
 };
 
+getUsers = function () {
+  User.find(function(err, usrs) {
+    usrs.forEach(function (usr){
+      usersColl[usr.username] = usr;
+    });
+    emitter.emit('GetMysqlSurveys');
+  })
+};
+
 var GetMysqlUsers = function (passConf) {
   var q = [
    " SELECT u.username,",
@@ -310,8 +319,8 @@ var GetMysqlSurveys = function () {
                   "t.type_name as type,",
                   "d.text_data AS default_value",
                 "FROM question AS q",
-                  "JOIN `question_type` AS t ON t.id = q.question_type_id",
-                  "JOIN `default_answer` AS d ON d.id = q.default_answer_id",
+                  "LEFT JOIN `question_type` AS t ON t.id = q.question_type_id",
+                  "LEFT JOIN `default_answer` AS d ON d.id = q.default_answer_id",
                 "WHERE q.category_id = ?",
               ].join("\n");
               async.each(ctgrs, function( ctgr, ctgCallback) {
@@ -335,7 +344,7 @@ var GetMysqlSurveys = function () {
                           value: item.option_value,
                         }
                       });
-                      if (qst.default_value.length) {
+                      if (qst.default_value) {
                         qst.defaultValue = qst.default_value;
                       }
                       qst.tagName = qst.type;
@@ -553,7 +562,13 @@ function dbConnect(config, cb) {
       return;
     }
 
-    mongoose.connection.db.executeDbCommand({dropDatabase:1});
+    //mongoose.connection.db.executeDbCommand({dropDatabase:1});
+    mongoose.connection.collections['surveys'].drop( function(err) {
+        console.log('surveys dropped');
+    });
+    mongoose.connection.collections['results'].drop( function(err) {
+        console.log('results dropped');
+    });
     console.log('\r\n Connected to MongoDb v.' + mongoose.version);
     conn = mysql.createConnection({
       host     : config.msqlHost,//localhost
@@ -588,7 +603,8 @@ function dbConnect(config, cb) {
         sendemail: config.sendemail == 'sendemail' ? true : false,
         sendsms: config.sendsms == 'sendsms' ? true : false
       };
-      GetMysqlUsers(passConf);
+      //GetMysqlUsers(passConf);
+      getUsers();
     });
   });
 }
