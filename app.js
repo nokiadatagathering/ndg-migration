@@ -376,7 +376,7 @@ var GetMysqlSurveys = function () {
                   });
                 })
               }, function () {
-                  var usr = usersColl[survey.username]
+                  var usr = usersColl[survey.username];
                   survey._owner = usr._owner;
                   survey._creator = usr;
                   survey.dateCreated = survey.upload_date;
@@ -563,12 +563,6 @@ function dbConnect(config, cb) {
     }
 
     //mongoose.connection.db.executeDbCommand({dropDatabase:1});
-    mongoose.connection.collections['surveys'].drop( function(err) {
-        console.log('surveys dropped');
-    });
-    mongoose.connection.collections['results'].drop( function(err) {
-        console.log('results dropped');
-    });
     console.log('\r\n Connected to MongoDb v.' + mongoose.version);
     conn = mysql.createConnection({
       host     : config.msqlHost,//localhost
